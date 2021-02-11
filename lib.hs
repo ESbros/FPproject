@@ -231,7 +231,7 @@ createNewFacture = do
     then do
       itemList <- addItems "yes" (maximum f_numb +1) day month (fromIntegral year) dni 1 1
       print $ foldl (\t (x, y) -> t + y) 0 itemList
-      putStr "Factura creada!"
+      putStr "Factura creada!\n"
       return Bill {id_bill = (maximum f_numb +1), diaa = day, mess = month, ano = year, cliente_info = clientInfo, items = itemList, vendedor = empInfo,tienda_info = tInfo, total = (foldl (\t (x, y) -> t + y) 0 itemList) }
 
     else do
@@ -252,6 +252,7 @@ createNewFacture = do
       return Bill {id_bill = (maximum f_numb +1), diaa = day, mess = month, ano = year, cliente_info = clientInfo, items = itemList, vendedor = empInfo,tienda_info = tInfo, total = (foldl (\t (x, y) -> t + y) 0 itemList) }
   
     --insertItem 3 20 2 2020 1 1 61020664
+
 genereMostReades :: IO [Text]
 genereMostReades = do
   books<-withSQLite "storedb1.sqlite" $ query $ do
@@ -260,6 +261,24 @@ genereMostReades = do
     restrict(bs ! #isbn .== soldBs ! #id_item)
     return (bs ! #genero)  
   return books
+
+queryForBook :: Col b Int -> SeldaM b ()
+queryForBook bookISBN = do
+    queryForBooks <- query $ do
+        book <- select libro
+        restrict (book ! #isbn .== bookISBN)
+        return (book ! #isbn :*: book ! #name :*: book ! #author)
+    liftIO $ print queryForBooks
+
+
+queryForSale :: Col b Int -> SeldaM b ()
+queryForSale daySale = do
+    queryForSales <- query $ do
+        sale <- select venta
+        restrict (sale ! #dia .== daySale)
+        return ( sale ! #id_item :*: sale ! #mes :*: sale ! #año :*: sale ! #id_clientV) 
+    liftIO $ mapM_ print queryForSales
+
 
 sortElements :: Ord b => [(a,b)] -> [(a,b)]
 sortElements = sortBy (flip compare `on` snd)
@@ -287,9 +306,81 @@ main = do
   --insertBook "Steve Job" 1451648537 "Biographi" 2011 20 "Walter Isaacson" "Literatura S"
   --insertBook "Cold Fir" 590396560 "Suspens" 2002 23.3 "Tamora Pierce" "Blackie Book"
   --insertStore 1 "Nuevoteca" "Ibarra" "123-21"
-  a <- createNewFacture
-  print a
+    putStrLn ("\n-----------------------------------------------------------------\n\n1: Registrar Libro - 2: Consultar ventas dia - 3: Registrar Venta - 4: Consultar Libros | quit for leave\n")
+    options <- getLine
 
+    if options == "1" then do 
+        putStrLn ("Name book: ")
+        name <- readLn :: IO Text
+        putStrLn ("ISBN: ")
+        isbn <- readLn :: IO Int
+        putStrLn ("Genero: ")
+        genero <- readLn :: IO Text
+        putStrLn ("Publication Date: ")
+        publication_date <- readLn :: IO Int
+        putStrLn ("Price: ")
+        price <- readLn :: IO Double
+        putStrLn ("Author Name: ")
+        author <- readLn :: IO Text
+        putStrLn ("Press Name: ")
+        imprenta <- readLn :: IO Text
+        
+        withSQLite "storedb1.sqlite" $ do
+            insertBook name isbn genero publication_date price author imprenta
+        main
+
+    else if options == "2" then do
+        putStrLn ("Day: ")
+        daySale <- readLn :: IO Integer
+        putStr "ISBN\tMont\tYear\tClient_ID\n\n"
+        withSQLite "storedb1.sqlite" $ do
+            queryForSale $ fromInteger daySale
+        main
+
+    else if options == "3" then do
+        
+        a <- createNewFacture
+        putStrLn(":*::*::*::*::*::*::*::*::*::*::*::*::*::*::*:")        
+        putStrLn(":*::*::*::*::*::*::*::*::*::*::*::*::*::*::*:")
+        putStrLn(":*::*::*::*::*::*::*::*::*::*::*::*::*::*::*:")
+        putStrLn(":*::*::*::*::*::*::*::*::*::*::*::*::*::*::*:")
+        putStr "Numero de factura: "
+        print $ id_bill a
+        putStr "\nFecha: \nDia: "
+        print $ diaa a
+        putStr "Mes: "
+        print $ mess a
+        putStr "Año: "
+        print $ ano a
+        putStrLn "\nInformacion del Cliente: "
+        print $ cliente_info a
+        putStrLn "\nInformacion del Vendedor: "
+        print $ vendedor a
+        putStrLn "\nInformacion de la Tienda: "
+        print $ tienda_info a
+        putStr "\nItems: \n"
+        mapM_ print $ items a
+        putStr "\nTotal a pagar: "
+        print $ total a    
+        putStrLn(":*::*::*::*::*::*::*::*::*::*::*::*::*::*::*:")
+        putStrLn(":*::*::*::*::*::*::*::*::*::*::*::*::*::*::*:")
+        putStrLn(":*::*::*::*::*::*::*::*::*::*::*::*::*::*::*:")
+        putStrLn(":*::*::*::*::*::*::*::*::*::*::*::*::*::*::*:")
+        main
+    
+    else if options == "4" then do
+        putStrLn "----------------------------------------------------"
+        putStrLn "ISBN              Name                Author                Imprenta              Año de Publicacion"
+        bs <- withSQLite "storedb1.sqlite" $ query $ do
+          bs <- select libro
+          return (bs ! #isbn :*: bs ! #name :*: bs ! #author :*: bs ! #imprenta :*: bs ! #publication_date)
+        liftIO $ mapM_ print bs
+        putStrLn "----------------------------------------------------"
+        main
+    else if options == "quit" then do
+        return()
+    else
+        main
   
   --createTable empleado
   --createTable cliente
